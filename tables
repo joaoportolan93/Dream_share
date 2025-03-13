@@ -1,0 +1,206 @@
+-- 1. Tabela de Usuários
+CREATE TABLE usuarios (
+    id_usuario SERIAL PRIMARY KEY,
+    nome_usuario VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    senha_hash VARCHAR(255) NOT NULL,
+    nome_completo VARCHAR(100) NOT NULL,
+    bio TEXT,
+    avatar_url VARCHAR(255),
+    data_nascimento DATE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    verificado BOOLEAN DEFAULT FALSE,
+    status SMALLINT DEFAULT 1, -- 1: ativo, 2: suspenso, 3: desativado
+    privacidade_padrao SMALLINT DEFAULT 1 -- 1: público, 2: privado
+);
+
+-- 2. Tabela de Seguidores
+CREATE TABLE seguidores (
+    id_seguidor SERIAL PRIMARY KEY,
+    id_usuario_seguidor INT NOT NULL REFERENCES usuarios(id_usuario),
+    id_usuario_seguido INT NOT NULL REFERENCES usuarios(id_usuario),
+    data_seguimento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status SMALLINT DEFAULT 1, -- 1: ativo, 2: bloqueado
+    UNIQUE(id_usuario_seguidor, id_usuario_seguido)
+);
+
+-- 3. Tabela de Publicações (Sonhos)
+CREATE TABLE publicacoes (
+    id_publicacao SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+    conteudo_texto TEXT NOT NULL,
+    titulo VARCHAR(150),
+    data_sonho DATE,
+    tipo_sonho VARCHAR(50), -- ex: lúcido, pesadelo, recorrente
+    data_publicacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    editado BOOLEAN DEFAULT FALSE,
+    data_edicao TIMESTAMP,
+    visibilidade SMALLINT DEFAULT 1, -- 1: público, 2: lista de amigos, 3: privado
+    localizacao VARCHAR(100),
+    emocoes_sentidas TEXT, -- tags de emoções durante o sonho
+    views_count INT DEFAULT 0
+);
+
+-- 4. Tabela de Mídia das Publicações
+CREATE TABLE midia_publicacoes (
+    id_midia SERIAL PRIMARY KEY,
+    id_publicacao INT NOT NULL REFERENCES publicacoes(id_publicacao) ON DELETE CASCADE,
+    tipo_midia SMALLINT NOT NULL, -- 1: imagem, 2: vídeo, 3: GIF, 4: áudio
+    url_midia VARCHAR(255) NOT NULL,
+    descricao TEXT,
+    posicao_ordem SMALLINT DEFAULT 0,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tamanho_bytes INT,
+    largura INT, -- para imagens e vídeos
+    altura INT, -- para imagens e vídeos
+    duracao INT -- para vídeos e áudios (em segundos)
+);
+
+-- 5. Tabela de Hashtags
+CREATE TABLE hashtags (
+    id_hashtag SERIAL PRIMARY KEY,
+    texto_hashtag VARCHAR(50) NOT NULL UNIQUE,
+    contagem_uso INT DEFAULT 1,
+    primeira_utilizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultima_utilizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Tabela de Relação Publicação-Hashtags
+CREATE TABLE publicacao_hashtags (
+    id_publicacao INT NOT NULL REFERENCES publicacoes(id_publicacao) ON DELETE CASCADE,
+    id_hashtag INT NOT NULL REFERENCES hashtags(id_hashtag),
+    data_associacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_publicacao, id_hashtag)
+);
+
+-- 7. Tabela de Comentários
+CREATE TABLE comentarios (
+    id_comentario SERIAL PRIMARY KEY,
+    id_publicacao INT NOT NULL REFERENCES publicacoes(id_publicacao) ON DELETE CASCADE,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+    conteudo_texto TEXT NOT NULL,
+    data_comentario TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    editado BOOLEAN DEFAULT FALSE,
+    data_edicao TIMESTAMP,
+    id_comentario_pai INT REFERENCES comentarios(id_comentario), -- para respostas a comentários
+    status SMALLINT DEFAULT 1 -- 1: ativo, 2: removido, 3: denunciado
+);
+
+-- 8. Tabela de Reações em Publicações
+CREATE TABLE reacoes_publicacoes (
+    id_reacao SERIAL PRIMARY KEY,
+    id_publicacao INT NOT NULL REFERENCES publicacoes(id_publicacao) ON DELETE CASCADE,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+    data_reacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(id_publicacao, id_usuario) -- Um usuário só pode ter uma reação por publicação
+);
+
+-- 9. Tabela de Reações em Comentários
+CREATE TABLE reacoes_comentarios (
+    id_reacao SERIAL PRIMARY KEY,
+    id_comentario INT NOT NULL REFERENCES comentarios(id_comentario) ON DELETE CASCADE,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+    tipo_reacao SMALLINT NOT NULL, -- 1: gostei, 2: amei, 3: confuso, 4: assustado, 5: relacionável
+    data_reacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(id_comentario, id_usuario) -- Um usuário só pode ter uma reação por comentário
+);
+
+-- 10. Tabela de Lista de Amigos Próximos
+CREATE TABLE lista_amigos_proximos (
+    id_lista SERIAL PRIMARY KEY,
+    id_usuario_dono INT NOT NULL REFERENCES usuarios(id_usuario),
+    nome_lista VARCHAR(50) DEFAULT 'Amigos Próximos',
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 11. Tabela de Membros da Lista de Amigos Próximos
+CREATE TABLE membros_lista_amigos (
+    id_lista INT NOT NULL REFERENCES lista_amigos_proximos(id_lista),
+    id_usuario_membro INT NOT NULL REFERENCES usuarios(id_usuario),
+    data_adicao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_lista, id_usuario_membro)
+);
+
+-- 12. Tabela de Notificações
+CREATE TABLE notificacoes (
+    id_notificacao SERIAL PRIMARY KEY,
+    id_usuario_destino INT NOT NULL REFERENCES usuarios(id_usuario),
+    id_usuario_origem INT REFERENCES usuarios(id_usuario),
+    tipo_notificacao SMALLINT NOT NULL, -- 1: nova publicação, 2: comentário, 3: curtida, 4: seguidor novo
+    id_referencia INT, -- ID da publicação, comentário, etc. que gerou a notificação
+    conteudo TEXT,
+    lida BOOLEAN DEFAULT FALSE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_leitura TIMESTAMP
+);
+
+-- 13. Tabela de Símbolos ou Elementos Recorrentes nos Sonhos
+CREATE TABLE elementos_sonhos (
+    id_elemento SERIAL PRIMARY KEY,
+    nome_elemento VARCHAR(100) NOT NULL,
+    categoria VARCHAR(50),
+    descricao TEXT,
+    contagem_usos INT DEFAULT 1
+);
+
+-- 14. Tabela de Relação Publicação-Elementos
+CREATE TABLE publicacao_elementos (
+    id_publicacao INT NOT NULL REFERENCES publicacoes(id_publicacao) ON DELETE CASCADE,
+    id_elemento INT NOT NULL REFERENCES elementos_sonhos(id_elemento),
+    data_associacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_publicacao, id_elemento)
+);
+
+-- 15. Tabela de Mensagens Diretas
+CREATE TABLE mensagens_diretas (
+    id_mensagem SERIAL PRIMARY KEY,
+    id_usuario_remetente INT NOT NULL REFERENCES usuarios(id_usuario),
+    id_usuario_destinatario INT NOT NULL REFERENCES usuarios(id_usuario),
+    conteudo TEXT NOT NULL,
+    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    lida BOOLEAN DEFAULT FALSE,
+    data_leitura TIMESTAMP,
+    deletada_remetente BOOLEAN DEFAULT FALSE,
+    deletada_destinatario BOOLEAN DEFAULT FALSE
+);
+
+-- 16. Tabela de Denúncias
+CREATE TABLE denuncias (
+    id_denuncia SERIAL PRIMARY KEY,
+    id_usuario_denunciante INT NOT NULL REFERENCES usuarios(id_usuario),
+    tipo_conteudo SMALLINT NOT NULL, -- 1: publicação, 2: comentário, 3: usuário
+    id_conteudo INT NOT NULL, -- ID da publicação, comentário ou usuário
+    motivo_denuncia SMALLINT NOT NULL, -- 1: conteúdo inadequado, 2: assédio, 3: spam
+    descricao_denuncia TEXT,
+    data_denuncia TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status_denuncia SMALLINT DEFAULT 1, -- 1: pendente, 2: analisada, 3: resolvida
+    data_resolucao TIMESTAMP,
+    acao_tomada SMALLINT -- 1: nenhuma, 2: removido, 3: usuário suspenso
+);
+
+-- 17. Tabela de Estatísticas de Sonhos por Usuário
+CREATE TABLE estatisticas_sonhos (
+    id_estatistica SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+    total_sonhos INT DEFAULT 0,
+    pesadelos_registrados INT DEFAULT 0,
+    sonhos_lucidos_registrados INT DEFAULT 0,
+    elementos_recorrentes_top JSONB, -- Armazena um JSON com os elementos mais frequentes
+    padrao_sono_medio VARCHAR(50), -- ex: "irregular", "consistente"
+    ultimo_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 18. Tabela de Configurações de Usuário
+CREATE TABLE configuracoes_usuario (
+    id_usuario INT PRIMARY KEY REFERENCES usuarios(id_usuario),
+    notificacoes_novas_publicacoes BOOLEAN DEFAULT TRUE,
+    notificacoes_comentarios BOOLEAN DEFAULT TRUE,
+    notificacoes_seguidor_novo BOOLEAN DEFAULT TRUE,
+    notificacoes_reacoes BOOLEAN DEFAULT TRUE,
+    notificacoes_mensagens_diretas BOOLEAN DEFAULT TRUE,
+    tema_interface SMALLINT DEFAULT 1, -- 1: claro, 2: escuro, 3: sistema
+    idioma VARCHAR(10) DEFAULT 'pt-BR',
+    mostrar_visualizacoes BOOLEAN DEFAULT TRUE,
+    ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
